@@ -12,7 +12,7 @@ I built Spud as a simple alternative to SpotDL which I noted has become more err
 To obtain a Spotify Web API ID and Secret,
 1. Go to developer.spotify.com/dashboard
 2. Create a new app 
-3. *CRITICAL*: For this app, you must set the *Redirect URI* to `http://127.0.0.1:8888/callback`
+3. For this app, you must set the *Redirect URI* to `http://127.0.0.1:8888/callback`
 4. Get your credentials (*Client ID* and *Client Secret*)
 5. Paste in credentials when prompted (will be saved locally)
 
@@ -38,8 +38,8 @@ yt-dlp is used to download songs from youtube
 This tool is for personal use only. Please support the artists by listening to their music on official platforms.
 
 # TODO:
-- [ ] CLI
+- [x] Add progress bars
+- [x] Add Windows Support
 - [ ] Add logging
-- [ ] Add progress bars
-- [ ] Add Windows Support
+- [ ] CLI
 - [ ] Add better error handling for incorrect credentials

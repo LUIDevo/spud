@@ -1,6 +1,6 @@
 [package]
 name = "spud"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 
 [dependencies]
@@ -12,3 +12,4 @@ open = "5.3.3"
 serde_json = "1.0.149"
 clap = { version = "4.5.60", features = ["derive"] }
 confy = "2.0.0"
+indicatif = "0.18.4"
