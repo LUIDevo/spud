@@ -159,6 +159,7 @@ async fn get_code(client_id: &str) -> Result<String, Box<dyn std::error::Error>>
         Ok(()) => (),
         Err(err) => eprintln!("An error occurred when opening '{}': {}", path, err),
     }
+    println!("Opened authentication request in browser");
     //create TCP connection server
     let (mut socket, _)=listener.accept().await?;
     let mut buf=[0;4096];
