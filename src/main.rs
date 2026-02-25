@@ -189,7 +189,7 @@ async fn get_authentication_token(client_id: &str,client_secret: &str) -> Result
     // println!("{:?}",auth_token);
     let json: serde_json::Value=res.json().await?;
     let auth_token=&json["access_token"];
-    println!("{:?}",auth_token);
+    // println!("{:?}",auth_token);
     Ok(auth_token.as_str().ok_or("err")?.to_string())
 }
 
