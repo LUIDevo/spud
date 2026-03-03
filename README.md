@@ -1,5 +1,8 @@
 # Spud - A Spotify Downloader Alternative
+
 *Spud* is a playlist downloader built in Rust. It uses the Spotify API to fetch playlist metadata, and retrieves audio using yt-dlp to get mp3 files.
+
+![ezgif-308b3ab9257cbc2a](https://github.com/user-attachments/assets/721aa835-c2be-4ea2-83d6-7ba639b24d3c)
 
 I built Spud as a simple alternative to SpotDL which I noted has become more error prone as of 2026, and I wanted to make an alternative for myself that feels more stable.
 
