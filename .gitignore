@@ -4,3 +4,4 @@ songs.txt
 .DS_Store
 Thumbs.db
 Cargo.lock
+spotify.http

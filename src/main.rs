@@ -187,11 +187,32 @@ async fn get_authentication_token(client_id: &str,client_secret: &str) -> Result
         ("grant_type","authorization_code"),
     ];
     let res=client.post(token_url).form(&params).basic_auth(client_id,Some(client_secret)).send().await?;
-    // println!("{:?}",auth_token);
     let json: serde_json::Value=res.json().await?;
     let auth_token=&json["access_token"];
     // println!("{:?}",auth_token);
     Ok(auth_token.as_str().ok_or("err")?.to_string())
+}
+
+fn add_batch(songs: Option<&Vec<serde_json::Value>>,song_list: &mut Vec<(String,String)>, count:&mut i32)->i32{
+    if let Some(items)=songs{
+        for item in items {
+            let mut artists=String::new();
+            if let Some(artist_list) = item["item"]["artists"].as_array(){
+                for (index,artist) in artist_list.iter().enumerate() {
+                        let artist_name=artist["name"].as_str().unwrap_or("err");
+                        artists.push_str(artist_name);
+                        if index<artist_list.len()-1{
+                            artists.push_str(", ");
+                        }
+                }
+            }
+            let name=item["item"]["name"].as_str().unwrap_or("invalid string").to_string();
+            // println!("Artists: {}, Name: {}, count: {}", &artists, &name, &count);
+            *count+=1;
+            song_list.push((artists, name));
+        }
+    }
+    *count
 }
 
 #[tokio::main]
@@ -211,27 +232,19 @@ async fn main()-> Result<(),Box<dyn std::error::Error>> {
     let playlist_url=format!("https://api.spotify.com/v1/playlists/{}/items",args.playlist);
     let client=reqwest::Client::new();
     let body=client.get(playlist_url).bearer_auth(&auth_token).send().await?;
-    let json: serde_json::Value=body.json().await?;
+    let mut json: serde_json::Value=body.json().await?;
     // TODO: I believe I can optimise this with structs later. But temporarily this will work
     let mut song_list: Vec<(String,String)>=Vec::new();
-    // let mut count=0;
-    if let Some(items)=json["items"].as_array(){
-        for item in items {
-            let mut artists=String::new();
-            if let Some(artist_list) = item["item"]["artists"].as_array(){
-                for (index,artist) in artist_list.iter().enumerate() {
-                        let artist_name=artist["name"].as_str().unwrap_or("err");
-                        artists.push_str(artist_name);
-                        if index<artist_list.len()-1{
-                            artists.push_str(", ");
-                        }
-                }
-            }
-            let name=item["item"]["name"].as_str().unwrap_or("invalid string").to_string();
-            // println!("Artists: {}, Name: {}, count: {}", &artists, &name, &count);
-            // count+=1;
-            song_list.push((artists, name));
+    let mut count=0;
+    let mut next_url=&json["next"];
+    loop{
+        count=add_batch(json["items"].as_array(),&mut song_list,&mut count);
+        if next_url.is_null(){
+            break;
         }
+        let body=client.get(next_url.as_str().unwrap_or("")).bearer_auth(&auth_token).send().await?;
+        json=body.json().await?;
+        next_url=&json["next"];
     }
     let mut file=File::create("songs.txt")?;
     for (artists, song_name) in &song_list{
