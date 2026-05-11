@@ -37,7 +37,10 @@ where P: AsRef<Path>, {
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
-    playlist: String,
+    playlist: Option<String>,
+
+    #[arg(short, long="continue")]
+    resume: Option<u32>,
 }
 
 fn check_configuration()->(String, String){
@@ -71,17 +74,17 @@ fn check_configuration()->(String, String){
     (client_id, client_secret)
 }
 
-fn download_songs() -> std::io::Result<()> {
+fn download_songs(start: usize) -> std::io::Result<()> {
     fs::create_dir_all("songs")?;
     let count = read_lines("./songs.txt")?.count();
-    let bar=ProgressBar::new(count as u64);
+    let bar=ProgressBar::new((count - start) as u64);
     bar.set_style(
         ProgressStyle::default_bar()
         .template("{bar:50} {pos}/{len} {msg}")
         .unwrap()
     );
     if let Ok(lines) = read_lines("./songs.txt") {
-        for line in lines.map_while(Result::ok) {
+        for line in lines.map_while(Result::ok).skip(start) {
             let output = if cfg!(target_os="windows"){
                 Command::new("yt-dlp")
                     .arg(&line)
@@ -226,36 +229,56 @@ async fn main()-> Result<(),Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
     let args = Args::parse();
-    let (client_id,client_secret)=check_configuration();
-    // TODO: Create one client, and reference it in authentication so I dont create duplicates
-    let auth_token=get_authentication_token(&client_id, &client_secret).await?;
-    let playlist_url=format!("https://api.spotify.com/v1/playlists/{}/items",args.playlist);
-    let client=reqwest::Client::new();
-    let body=client.get(playlist_url).bearer_auth(&auth_token).send().await?;
-    let mut json: serde_json::Value=body.json().await?;
-    // TODO: I believe I can optimise this with structs later. But temporarily this will work
-    let mut song_list: Vec<(String,String)>=Vec::new();
-    let mut count=0;
-    let mut next_url=&json["next"];
-    loop{
-        count=add_batch(json["items"].as_array(),&mut song_list,&mut count);
-        if next_url.is_null(){
-            break;
+    match (args.playlist, args.resume){
+        (Some(id), _)=>{
+            // TODO: Create one client, and reference it in authentication so I dont create duplicates
+            let (client_id,client_secret)=check_configuration();
+            let auth_token=get_authentication_token(&client_id, &client_secret).await?;
+            let playlist_url=format!("https://api.spotify.com/v1/playlists/{}/items",id);
+            let client=reqwest::Client::new();
+            let body=client.get(playlist_url).bearer_auth(&auth_token).send().await?;
+            let mut json: serde_json::Value=body.json().await?;
+            // TODO: I believe I can optimise this with structs later. But temporarily this will work
+            let mut song_list: Vec<(String,String)>=Vec::new();
+            let mut count=0;
+            let mut next_url=&json["next"];
+            loop{
+                count=add_batch(json["items"].as_array(),&mut song_list,&mut count);
+                if next_url.is_null(){
+                    break;
+                }
+                let body=client.get(next_url.as_str().unwrap_or("")).bearer_auth(&auth_token).send().await?;
+                json=body.json().await?;
+                next_url=&json["next"];
+            }
+            let mut file=File::create("songs.txt")?;
+            for (artists, song_name) in &song_list{
+                writeln!(file, "ytsearch1:{} - {} Topic", artists, song_name)?;
+            }
+            let _download_songs=match download_songs(0){
+                std::result::Result::Ok(_)=>(),
+                std::result::Result::Err(err)=>{
+                    println!("error downloading songs: {}", err); 
+                }
+            };
+            fs::remove_file("songs.txt")?; // remove file at the end
+            Ok(())
+        },
+        (_, Some(n))=>{
+            if !Path::new("songs.txt").exists() {
+                eprintln!("No songs.txt found. Run with --playlist first.");
+            } else {
+                let _download_songs=match download_songs(n as usize){
+                    std::result::Result::Ok(_)=>(),
+                    std::result::Result::Err(err)=>{
+                        println!("error downloading songs: {}", err); 
+                    }
+            };
+            }
+            Ok(())
+        },
+        _=> { eprintln!("Provide either --playlist or --continue"); 
+            Ok(())
         }
-        let body=client.get(next_url.as_str().unwrap_or("")).bearer_auth(&auth_token).send().await?;
-        json=body.json().await?;
-        next_url=&json["next"];
     }
-    let mut file=File::create("songs.txt")?;
-    for (artists, song_name) in &song_list{
-        writeln!(file, "ytsearch1:{} - {} Topic", artists, song_name)?;
-    }
-    let _download_songs=match download_songs(){
-        std::result::Result::Ok(_)=>(),
-        std::result::Result::Err(err)=>{
-            println!("error downloading songs: {}", err); 
-        }
-    };
-    fs::remove_file("songs.txt")?; // remove file at the end
-    Ok(())
 }
